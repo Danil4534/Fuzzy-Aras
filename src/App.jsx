@@ -140,7 +140,6 @@ export default function App() {
     return result;
   }, [criteriaWeights, numCriteria, numExperts]);
 
-  // 2) Aggregate alternatives evaluations across experts -> matrix A: alt x criteria (triangular numbers)
   const aggregatedAlts = useMemo(() => {
     const K = numExperts;
     const res = [];
@@ -177,7 +176,7 @@ export default function App() {
         if (tri[1] > maxM) maxM = tri[1];
         if (tri[2] > maxU) maxU = tri[2];
       }
-      // If no alternatives, fallback to aggregatedCriteria
+
       if (!isFinite(maxL)) {
         res.push(aggregatedCriteria[j]);
       } else {
@@ -277,7 +276,7 @@ export default function App() {
 
   const renderCriteriaTable = () => {
     return (
-      <div className="overflow-auto">
+      <div className="overflow-auto border p-2 rounded">
         <table className="table-auto border-collapse w-full text-sm">
           <thead>
             <tr>
@@ -429,7 +428,7 @@ export default function App() {
         </div>
       </div>
 
-      <div className="flex gap-2 mb-4 hidden">
+      <div className="flex gap-2 mb-4 ">
         <button onClick={loadSample} className="px-3 py-2  text-black rounded">
           Load sample
         </button>
@@ -456,7 +455,7 @@ export default function App() {
 
       <section className="mb-6">
         <h3 className="font-semibold mb-2">3) Матриця агрегованих оцінок</h3>
-        <div className="overflow-auto">
+        <div className="overflow-auto border p-2 rounded">
           <table className="table-auto w-full text-sm">
             <thead>
               <tr>
@@ -498,7 +497,7 @@ export default function App() {
         <h3 className="font-semibold mb-2">
           4) Перетворення ЛТ в трикутні числа по критеріям
         </h3>
-        <div className="overflow-auto">
+        <div className="overflow-auto border p-2 rounded">
           <table className="table-auto w-full text-sm">
             <thead>
               <tr>
@@ -537,7 +536,7 @@ export default function App() {
         <h3 className="font-semibold mb-2">
           5) Перетворення ЛТ в трикутні числа по альтернативам
         </h3>
-        <div className="overflow-auto">
+        <div className="overflow-auto border p-2 rounded">
           <table className="table-auto w-full text-sm">
             <thead>
               <tr>
@@ -577,167 +576,320 @@ export default function App() {
         </div>
       </section>
       <section className="mb-6">
-        <h2 className="font-semibold mb-2">6) Матриця нечітких чисел по критеріям для всіх експертів</h2>
-        <div className="overflow-auto">
+        <h2 className="font-semibold mb-2">
+          6) Матриця нечітких чисел по критеріям для всіх експертів
+        </h2>
+        <div className="overflow-auto border p-2 rounded">
           <table className="table-auto w-full text-sm">
             <thead>
               <tr>
                 <th className="border px-2 py-1">Criterion</th>
-                <th className="border px-2 py-1">Optimal [l,m,u]</th>
-                <th className="border px-2 py-1">Defuzzified</th>
+                <th className="border px-2 py-1">l </th>
+                <th className="border px-2 py-1">l' </th>
+                <th className="border px-2 py-1">m' </th>
+                <th className="border px-2 py-1">u'</th>
+                <th className="border px-2 py-1">u </th>
+
               </tr>
             </thead>
             <tbody>
-              {optimalCriteria.map((tri, j) => (
-                <tr key={j}>
-                  <td className="border px-2 py-1">C{j + 1}</td>
-                  <td className="border px-2 py-1">[{tri.map((v) => v.toFixed(4)).join(", ")}]</td>
-                  <td className="border px-2 py-1">{defuzz(tri).toFixed(4)}</td>
-                </tr>
-              ))}
+              {Array.from({ length: numCriteria }).map((_, j) => {
+
+                const tris = Array.from({ length: numExperts }).map(
+                  (__, eIdx) => CRITERIA_TERMS[criteriaWeights[eIdx]?.[j] || "M"]
+                );
+
+                const lMin = Math.min(...tris.map((t) => t[0]));
+                const uMax = Math.max(...tris.map((t) => t[2]));
+                const lProd = Math.pow(tris.reduce((acc, t) => acc * t[0], 1), 1 / numExperts);
+                const mProd = Math.pow(tris.reduce((acc, t) => acc * t[1], 1), 1 / numExperts);
+                const uProd = Math.pow(tris.reduce((acc, t) => acc * t[2], 1), 1 / numExperts);
+
+                return (
+                  <tr key={j}>
+                    <td className="border px-2 py-1 font-medium text-center">C{j + 1}</td>
+                    <td className="border px-2 py-1 text-center">{lMin}</td>
+                    <td className="border px-2 py-1 text-center">{lProd}</td>
+                    <td className="border px-2 py-1 text-center">{mProd}</td>
+                    <td className="border px-2 py-1 text-center">{uProd}</td>
+                    <td className="border px-2 py-1 text-center">{uMax}</td>
+
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </section>
 
-
-
-
-      {/* <section className="mb-6">
-        <h2 className="font-semibold mb-2">3) Aggregated fuzzy criteria (averaged across experts)</h2>
+      <section className="mb-6">
+        <h2 className="font-semibold mb-2">
+          7) Матриця нечітких чисел по критеріям для кожної альтернативи
+        </h2>
         <div className="overflow-auto">
-          <table className="table-auto w-full text-sm">
+          {Array.from({ length: numAlternatives }).map((_, aIdx) => (
+            <div key={aIdx} className="mb-4 border p-2 rounded">
+              <h3 className="font-medium mb-2">Альтернатива A{aIdx + 1}</h3>
+              <table className="table-auto w-full text-sm">
+                <thead>
+                  <tr>
+                    <th className="border px-2 py-1">Criterion</th>
+                    <th className="border px-2 py-1">l </th>
+                    <th className="border px-2 py-1">l' </th>
+                    <th className="border px-2 py-1">m'</th>
+                    <th className="border px-2 py-1">u'</th>
+                    <th className="border px-2 py-1">u </th>
+
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({ length: numCriteria }).map((_, cIdx) => {
+                    const tris = Array.from({ length: numExperts }).map(
+                      (_, eIdx) => ALT_TERMS[altEvaluations[eIdx]?.[aIdx]?.[cIdx] || "F"]
+                    );
+
+                    const lMin = Math.min(...tris.map((t) => t[0]));
+                    const uMax = Math.max(...tris.map((t) => t[2]));
+                    const lProd = Math.pow(tris.reduce((acc, t) => acc * t[0], 1), 1 / numExperts);
+                    const mProd = Math.pow(tris.reduce((acc, t) => acc * t[1], 1), 1 / numExperts);
+                    const uProd = Math.pow(tris.reduce((acc, t) => acc * t[2], 1), 1 / numExperts);
+
+                    return (
+                      <tr key={cIdx}>
+                        <td className="border px-2 py-1 text-center">C{cIdx + 1}</td>
+                        <td className="border px-2 py-1 text-center">{lMin}</td>
+                        <td className="border px-2 py-1 text-center">{lProd}</td>
+                        <td className="border px-2 py-1 text-center">{mProd}</td>
+                        <td className="border px-2 py-1 text-center">{uProd}</td>
+                        <td className="border px-2 py-1 text-center">{uMax}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+      </section>
+
+
+      <section className="mb-6">
+        <h2 className="font-semibold mb-2">8) Матриця оптимальних значень критеріїв</h2>
+        <div className="overflow-auto border p-2 rounded">
+          <table className="table-auto w-full text-sm border">
             <thead>
               <tr>
                 <th className="border px-2 py-1">Criterion</th>
-                <th className="border px-2 py-1">[l, m, u]</th>
-                <th className="border px-2 py-1">Defuzzified</th>
+                <th className="border px-2 py-1">l</th>
+                <th className="border px-2 py-1">l'</th>
+                <th className="border px-2 py-1">m'</th>
+                <th className="border px-2 py-1">u'</th>
+                <th className="border px-2 py-1">u</th>
               </tr>
             </thead>
             <tbody>
-              {aggregatedCriteria.map((tri, j) => (
-                <tr key={j}>
-                  <td className="border px-2 py-1">C{j + 1}</td>
-                  <td className="border px-2 py-1">[{tri.map((v) => v.toFixed(4)).join(", ")}]</td>
-                  <td className="border px-2 py-1">{defuzz(tri).toFixed(4)}</td>
-                </tr>
-              ))}
+              {Array.from({ length: numCriteria }).map((_, cIdx) => {
+
+                const tris = Array.from({ length: numAlternatives }).map((_, aIdx) => {
+                  const expertTris = Array.from({ length: numExperts }).map(
+                    (_, eIdx) => ALT_TERMS[altEvaluations[eIdx]?.[aIdx]?.[cIdx] || "F"]
+                  );
+
+                  const lProd = Math.pow(expertTris.reduce((acc, t) => acc * t[0], 1), 1 / numExperts);
+                  const mProd = Math.pow(expertTris.reduce((acc, t) => acc * t[1], 1), 1 / numExperts);
+                  const uProd = Math.pow(expertTris.reduce((acc, t) => acc * t[2], 1), 1 / numExperts);
+                  const lMin = Math.min(...expertTris.map(t => t[0]));
+                  const uMax = Math.max(...expertTris.map(t => t[2]));
+                  return [lMin, lProd, mProd, uProd, uMax];
+                });
+
+
+                const lOpt = Math.max(...tris.map(t => t[0]));
+                const lOptP = Math.max(...tris.map(t => t[1]));
+                const mOptP = Math.max(...tris.map(t => t[2]));
+                const uOptP = Math.max(...tris.map(t => t[3]));
+                const uOpt = Math.max(...tris.map(t => t[4]));
+
+                return (
+                  <tr key={cIdx}>
+                    <td className="border px-2 py-1 text-center">C{cIdx + 1}</td>
+                    <td className="border px-2 py-1 text-center">{lOpt.toFixed(5)}</td>
+                    <td className="border px-2 py-1 text-center">{lOptP.toFixed(5)}</td>
+                    <td className="border px-2 py-1 text-center">{mOptP.toFixed(5)}</td>
+                    <td className="border px-2 py-1 text-center">{uOptP.toFixed(5)}</td>
+                    <td className="border px-2 py-1 text-center">{uOpt.toFixed(5)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </section>
 
+
       <section className="mb-6">
-        <h2 className="font-semibold mb-2">4) Aggregated alternatives fuzzy matrix</h2>
+        <h2 className="font-semibold mb-2">9) Матриця нормованих значень</h2>
         <div className="overflow-auto">
-          <table className="table-auto w-full text-sm">
-            <thead>
-              <tr>
-                <th className="border px-2 py-1">Alt \ Crit</th>
-                {Array.from({ length: numCriteria }).map((_, j) => <th key={j} className="border px-2 py-1">C{j + 1}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {aggregatedAlts.map((row, a) => (
-                <tr key={a}>
-                  <td className="border px-2 py-1">A{a + 1}</td>
-                  {row.map((tri, j) => (
-                    <td key={j} className="border px-2 py-1">[{tri.map((v) => v.toFixed(4)).join(",")} ]</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {Array.from({ length: numCriteria }).map((_, cIdx) => {
+            // Собираем значения всех альтернатив для текущего критерия
+            const allAltsTris = Array.from({ length: numAlternatives }).map((_, aIdx) => {
+              const tris = Array.from({ length: numExperts }).map(
+                (_, eIdx) => ALT_TERMS[altEvaluations[eIdx]?.[aIdx]?.[cIdx] || "F"]
+              );
+
+              const lMin = Math.min(...tris.map(t => t[0]));
+              const lProd = Math.pow(tris.reduce((acc, t) => acc * t[0], 1), 1 / numExperts);
+              const mProd = Math.pow(tris.reduce((acc, t) => acc * t[1], 1), 1 / numExperts);
+              const uProd = Math.pow(tris.reduce((acc, t) => acc * t[2], 1), 1 / numExperts);
+              const uMax = Math.max(...tris.map(t => t[2]));
+
+              // Нормализация по количеству критериев
+              return [
+                lMin / numCriteria,
+                lProd / numCriteria,
+                mProd / numCriteria,
+                uProd / numCriteria,
+                uMax / numCriteria
+              ];
+            });
+
+            // Оптимальная альтернатива — максимум по каждой колонке
+            const optimalAlt = [
+              Math.max(...allAltsTris.map(t => t[0])),
+              Math.max(...allAltsTris.map(t => t[1])),
+              Math.max(...allAltsTris.map(t => t[2])),
+              Math.max(...allAltsTris.map(t => t[3])),
+              Math.max(...allAltsTris.map(t => t[4])),
+            ];
+
+            return (
+              <div key={cIdx} className="mb-4 border p-2 rounded">
+                <h3 className="font-medium mb-2">Criterion {cIdx + 1}</h3>
+                <table className="table-auto w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th className="border px-2 py-1">Alternative</th>
+                      {["l", "l'", "m'", "u'", "u"].map((label) => (
+                        <th key={label} className="border px-2 py-1">{label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Строка с оптимальной альтернативой */}
+                    <tr className="bg-gray-100 font-medium">
+                      <td className="border px-2 py-1 text-center">Optimal alternative</td>
+                      {optimalAlt.map((v, idx) => (
+                        <td key={idx} className="border px-2 py-1 text-center">{v.toFixed(5)}</td>
+                      ))}
+                    </tr>
+
+                    {/* Строки с остальными альтернативами */}
+                    {allAltsTris.map((vals, aIdx) => (
+                      <tr key={aIdx}>
+                        <td className="border px-2 py-1 text-center">Alternative {aIdx + 1}</td>
+                        {vals.map((v, idx) => (
+                          <td key={idx} className="border px-2 py-1 text-center">{v.toFixed(5)}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
         </div>
       </section>
 
       <section className="mb-6">
-        <h2 className="font-semibold mb-2">5) Optimal criteria (max across alternatives)</h2>
+        <h2 className="font-semibold mb-2">10) Нормована зважена матриця</h2>
         <div className="overflow-auto">
-          <table className="table-auto w-full text-sm">
-            <thead>
-              <tr>
-                <th className="border px-2 py-1">Criterion</th>
-                <th className="border px-2 py-1">Optimal [l,m,u]</th>
-                <th className="border px-2 py-1">Defuzzified</th>
-              </tr>
-            </thead>
-            <tbody>
-              {optimalCriteria.map((tri, j) => (
-                <tr key={j}>
-                  <td className="border px-2 py-1">C{j + 1}</td>
-                  <td className="border px-2 py-1">[{tri.map((v) => v.toFixed(4)).join(", ")}]</td>
-                  <td className="border px-2 py-1">{defuzz(tri).toFixed(4)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {Array.from({ length: numCriteria }).map((_, cIdx) => {
+            // Берем значения критерия из матрицы №6
+            const criterionTri = (() => {
+              const tris = Array.from({ length: numExperts }).map(
+                (_, eIdx) => CRITERIA_TERMS[criteriaWeights[eIdx]?.[cIdx] || "M"]
+              );
+              const lMin = Math.min(...tris.map(t => t[0]));
+              const lProd = Math.pow(tris.reduce((acc, t) => acc * t[0], 1), 1 / numExperts);
+              const mProd = Math.pow(tris.reduce((acc, t) => acc * t[1], 1), 1 / numExperts);
+              const uProd = Math.pow(tris.reduce((acc, t) => acc * t[2], 1), 1 / numExperts);
+              const uMax = Math.max(...tris.map(t => t[2]));
+              return [lMin, lProd, mProd, uProd, uMax];
+            })();
+
+            // Данные из матрицы №9 — нормализованные значения по критерию
+            const allAltsTris = Array.from({ length: numAlternatives }).map((_, aIdx) => {
+              const tris = Array.from({ length: numExperts }).map(
+                (_, eIdx) => ALT_TERMS[altEvaluations[eIdx]?.[aIdx]?.[cIdx] || "F"]
+              );
+
+              const lMin = Math.min(...tris.map(t => t[0]));
+              const lProd = Math.pow(tris.reduce((acc, t) => acc * t[0], 1), 1 / numExperts);
+              const mProd = Math.pow(tris.reduce((acc, t) => acc * t[1], 1), 1 / numExperts);
+              const uProd = Math.pow(tris.reduce((acc, t) => acc * t[2], 1), 1 / numExperts);
+              const uMax = Math.max(...tris.map(t => t[2]));
+              return [lMin / numCriteria, lProd / numCriteria, mProd / numCriteria, uProd / numCriteria, uMax / numCriteria];
+            });
+
+            // Оптимальна альтернатива из матрицы №9
+            const optimalAlt = [
+              Math.max(...allAltsTris.map(t => t[0])),
+              Math.max(...allAltsTris.map(t => t[1])),
+              Math.max(...allAltsTris.map(t => t[2])),
+              Math.max(...allAltsTris.map(t => t[3])),
+              Math.max(...allAltsTris.map(t => t[4])),
+            ];
+
+            // === Взвешивание ===
+            const weightedAlts = allAltsTris.map(vals =>
+              vals.map((v, idx) => v * criterionTri[idx])
+            );
+
+            const weightedOptimal = optimalAlt.map((v, idx) => v * criterionTri[idx]);
+
+            return (
+              <div key={cIdx} className="mb-4 border p-2 rounded">
+                <h3 className="font-medium mb-2">Criterion {cIdx + 1}</h3>
+                <table className="table-auto w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th className="border px-2 py-1">Alternative</th>
+                      {["l", "l'", "m'", "u'", "u"].map(label => (
+                        <th key={label} className="border px-2 py-1">{label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Оптимальная альтернатива */}
+                    <tr className="bg-gray-100 font-medium">
+                      <td className="border px-2 py-1 text-center">Optimal alternative</td>
+                      {weightedOptimal.map((v, idx) => (
+                        <td key={idx} className="border px-2 py-1 text-center">{v.toFixed(5)}</td>
+                      ))}
+                    </tr>
+
+                    {/* Остальные альтернативы */}
+                    {weightedAlts.map((vals, aIdx) => (
+                      <tr key={aIdx}>
+                        <td className="border px-2 py-1 text-center">Alternative {aIdx + 1}</td>
+                        {vals.map((v, idx) => (
+                          <td key={idx} className="border px-2 py-1 text-center">{v.toFixed(5)}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
         </div>
       </section>
 
-      <section className="mb-6">
-        <h2 className="font-semibold mb-2">6) Normalized & Weighted normalized matrix</h2>
-        <div className="overflow-auto">
-          <table className="table-auto w-full text-sm">
-            <thead>
-              <tr>
-                <th className="border px-2 py-1">Alt</th>
-                {Array.from({ length: numCriteria }).map((_, j) => <th key={j} className="border px-2 py-1">C{j + 1}</th>)}
-                <th className="border px-2 py-1">Sum fuzzy</th>
-                <th className="border px-2 py-1">Crisp utility</th>
-              </tr>
-            </thead>
-            <tbody>
-              {weightedNormalized.map((row, a) => (
-                <tr key={a}>
-                  <td className="border px-2 py-1">A{a + 1}</td>
-                  {row.map((tri, j) => (
-                    <td key={j} className="border px-2 py-1">[{tri.map((v) => v.toFixed(4)).join(",")} ]</td>
-                  ))}
-                  <td className="border px-2 py-1">[{utilitiesFuzzy[a].map((v) => v.toFixed(4)).join(",")} ]</td>
-                  <td className="border px-2 py-1">{utilitiesCrisp[a].toFixed(4)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
 
-      <section className="mb-6">
-        <h2 className="font-semibold mb-2">7) Ranking & Optimality degree</h2>
-        <div className="overflow-auto mb-4">
-          <table className="table-auto w-full text-sm">
-            <thead>
-              <tr>
-                <th className="border px-2 py-1">Alt</th>
-                <th className="border px-2 py-1">Utility (crisp)</th>
-                <th className="border px-2 py-1">Degree (relative)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {utilitiesCrisp.map((u, a) => (
-                <tr key={a} className="">
-                  <td className="border px-2 py-1">A{a + 1}</td>
-                  <td className="border px-2 py-1">{u.toFixed(4)}</td>
-                  <td className="border px-2 py-1">{optimalityDegrees[a].toFixed(4)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
 
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={chartData} margin={{ top: 15, right: 30, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" fill="#8884d8" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </section> */}
+
+
+
     </div>
   );
 }
