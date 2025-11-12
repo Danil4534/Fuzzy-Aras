@@ -236,11 +236,6 @@ export default function App() {
     return utilitiesCrisp.map((u) => u / maxU);
   }, [utilitiesCrisp]);
 
-  const chartData = utilitiesCrisp.map((val, idx) => ({
-    name: `Alt ${idx + 1}`,
-    value: +val.toFixed(4),
-    degree: +optimalityDegrees[idx].toFixed(4),
-  }));
 
   const loadSample = () => {
     const sampleCriteria = [
