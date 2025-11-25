@@ -30,6 +30,7 @@ const divTriScalar = (a, s) => [a[0] / s, a[1] / s, a[2] / s];
 const defuzz = (tri) => (tri[0] + tri[1] + tri[2]) / 3;
 
 export default function App() {
+  const CRITERIA_TYPES = ["benefit", "cost"];
   const [numAlternatives, setNumAlternatives] = useState(4);
   const [numCriteria, setNumCriteria] = useState(5);
   const [numExperts, setNumExperts] = useState(4);
@@ -43,7 +44,9 @@ export default function App() {
     }
     return arr;
   });
-
+  const [criteriaTypes, setCriteriaTypes] = useState(() =>
+    Array.from({ length: numCriteria }, () => "benefit")
+  );
   const [altEvaluations, setAltEvaluations] = useState(() => {
     const arr = [];
     for (let e = 0; e < numExperts; e++) {
@@ -66,6 +69,11 @@ export default function App() {
         for (let j = 0; j < nc; j++) row.push((prev[e] && prev[e][j]) || "M");
         res.push(row);
       }
+      return res;
+    });
+    setCriteriaTypes(prev => {
+      const res = [];
+      for (let j = 0; j < nc; j++) res.push(prev[j] || "benefit");
       return res;
     });
     setAltEvaluations((prev) => {
@@ -153,45 +161,75 @@ export default function App() {
 
   const optimalCriteria = useMemo(() => {
     const res = [];
+
     for (let j = 0; j < numCriteria; j++) {
-      let maxL = -Infinity,
-        maxM = -Infinity,
-        maxU = -Infinity;
+      const type = criteriaTypes[j];
+
+
+      let bestL = type === "benefit" ? -Infinity : Infinity;
+      let bestM = type === "benefit" ? -Infinity : Infinity;
+      let bestU = type === "benefit" ? -Infinity : Infinity;
+
       for (let a = 0; a < numAlternatives; a++) {
         const tri = aggregatedAlts[a][j];
         if (!tri) continue;
-        if (tri[0] > maxL) maxL = tri[0];
-        if (tri[1] > maxM) maxM = tri[1];
-        if (tri[2] > maxU) maxU = tri[2];
+
+        const [L, M, U] = tri;
+
+        if (type === "benefit") {
+          bestL = Math.max(bestL, L);
+          bestM = Math.max(bestM, M);
+          bestU = Math.max(bestU, U);
+        } else {
+          bestL = Math.min(bestL, L);
+          bestM = Math.min(bestM, M);
+          bestU = Math.min(bestU, U);
+        }
       }
 
-      if (!isFinite(maxL)) {
-        res.push(aggregatedCriteria[j]);
-      } else {
-        res.push([maxL, maxM, maxU]);
-      }
+      if (!isFinite(bestL)) bestL = 0;
+      if (!isFinite(bestM)) bestM = 0;
+      if (!isFinite(bestU)) bestU = 0;
+
+      res.push([bestL, bestM, bestU]);
     }
+
     return res;
-  }, [aggregatedAlts, aggregatedCriteria, numAlternatives, numCriteria]);
+  }, [criteriaTypes, aggregatedAlts, numCriteria, numAlternatives]);
+
 
   const normalizedMatrix = useMemo(() => {
     const res = [];
+
     for (let a = 0; a < numAlternatives; a++) {
       const row = [];
+
       for (let j = 0; j < numCriteria; j++) {
-        const triA = aggregatedAlts[a][j];
-        const triOpt = optimalCriteria[j];
-        const nn = [
-          triOpt[0] === 0 ? 0 : triA[0] / triOpt[0],
-          triOpt[1] === 0 ? 0 : triA[1] / triOpt[1],
-          triOpt[2] === 0 ? 0 : triA[2] / triOpt[2],
-        ];
-        row.push(nn);
+        const A = aggregatedAlts[a][j];
+        const Opt = optimalCriteria[j];
+        const type = criteriaTypes[j];
+
+        let nL, nM, nU;
+
+        if (type === "benefit") {
+          nL = Opt[0] === 0 ? 0 : A[0] / Opt[0];
+          nM = Opt[1] === 0 ? 0 : A[1] / Opt[1];
+          nU = Opt[2] === 0 ? 0 : A[2] / Opt[2];
+        } else {
+          nL = A[0] === 0 ? 0 : Opt[0] / A[0];
+          nM = A[1] === 0 ? 0 : Opt[1] / A[1];
+          nU = A[2] === 0 ? 0 : Opt[2] / A[2];
+        }
+
+        row.push([nL, nM, nU]);
       }
+
       res.push(row);
     }
+
     return res;
-  }, [aggregatedAlts, optimalCriteria, numAlternatives, numCriteria]);
+  }, [aggregatedAlts, optimalCriteria, criteriaTypes, numAlternatives, numCriteria]);
+
 
   const weightedNormalized = useMemo(() => {
     const res = [];
@@ -298,6 +336,28 @@ export default function App() {
             ))}
           </tbody>
         </table>
+        <div className="mt-3">
+          <h3 className="font-semibold mb-1">Типи критеріїв</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {criteriaTypes.map((t, j) => (
+              <div key={j} className="flex items-center gap-2">
+                <span>C{j + 1}</span>
+                <select
+                  value={criteriaTypes[j]}
+                  onChange={(e) => {
+                    const copy = [...criteriaTypes];
+                    copy[j] = e.target.value;
+                    setCriteriaTypes(copy);
+                  }}
+                  className="p-1 border rounded"
+                >
+                  <option value="benefit">Benefit</option>
+                  <option value="cost">Cost</option>
+                </select>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   };
@@ -689,13 +749,16 @@ export default function App() {
             </thead>
             <tbody>
               {Array.from({ length: numCriteria }).map((_, cIdx) => {
-                const tris = Array.from({ length: numAlternatives }).map(
+                const type = criteriaTypes[cIdx];
+
+                const trisByAlt = Array.from({ length: numAlternatives }).map(
                   (_, aIdx) => {
                     const expertTris = Array.from({ length: numExperts }).map(
                       (_, eIdx) =>
                         ALT_TERMS[altEvaluations[eIdx]?.[aIdx]?.[cIdx] || "F"]
                     );
 
+                    const lMin = Math.min(...expertTris.map((t) => t[0]));
                     const lProd = Math.pow(
                       expertTris.reduce((acc, t) => acc * t[0], 1),
                       1 / numExperts
@@ -708,38 +771,37 @@ export default function App() {
                       expertTris.reduce((acc, t) => acc * t[2], 1),
                       1 / numExperts
                     );
-                    const lMin = Math.min(...expertTris.map((t) => t[0]));
                     const uMax = Math.max(...expertTris.map((t) => t[2]));
+
                     return [lMin, lProd, mProd, uProd, uMax];
                   }
                 );
 
-                const lOpt = Math.max(...tris.map((t) => t[0]));
-                const lOptP = Math.max(...tris.map((t) => t[1]));
-                const mOptP = Math.max(...tris.map((t) => t[2]));
-                const uOptP = Math.max(...tris.map((t) => t[3]));
-                const uOpt = Math.max(...tris.map((t) => t[4]));
+
+                const lOpt = type === "benefit"
+                  ? Math.max(...trisByAlt.map((t) => t[0]))
+                  : Math.min(...trisByAlt.map((t) => t[0]));
+                const lOptP = type === "benefit"
+                  ? Math.max(...trisByAlt.map((t) => t[1]))
+                  : Math.min(...trisByAlt.map((t) => t[1]));
+                const mOptP = type === "benefit"
+                  ? Math.max(...trisByAlt.map((t) => t[2]))
+                  : Math.min(...trisByAlt.map((t) => t[2]));
+                const uOptP = type === "benefit"
+                  ? Math.max(...trisByAlt.map((t) => t[3]))
+                  : Math.min(...trisByAlt.map((t) => t[3]));
+                const uOpt = type === "benefit"
+                  ? Math.max(...trisByAlt.map((t) => t[4]))
+                  : Math.min(...trisByAlt.map((t) => t[4]));
 
                 return (
                   <tr key={cIdx}>
-                    <td className="border px-2 py-1 text-center">
-                      C{cIdx + 1}
-                    </td>
-                    <td className="border px-2 py-1 text-center">
-                      {lOpt.toFixed(5)}
-                    </td>
-                    <td className="border px-2 py-1 text-center">
-                      {lOptP.toFixed(5)}
-                    </td>
-                    <td className="border px-2 py-1 text-center">
-                      {mOptP.toFixed(5)}
-                    </td>
-                    <td className="border px-2 py-1 text-center">
-                      {uOptP.toFixed(5)}
-                    </td>
-                    <td className="border px-2 py-1 text-center">
-                      {uOpt.toFixed(5)}
-                    </td>
+                    <td className="border px-2 py-1 text-center">C{cIdx + 1}</td>
+                    <td className="border px-2 py-1 text-center">{lOpt.toFixed(5)}</td>
+                    <td className="border px-2 py-1 text-center">{lOptP.toFixed(5)}</td>
+                    <td className="border px-2 py-1 text-center">{mOptP.toFixed(5)}</td>
+                    <td className="border px-2 py-1 text-center">{uOptP.toFixed(5)}</td>
+                    <td className="border px-2 py-1 text-center">{uOpt.toFixed(5)}</td>
                   </tr>
                 );
               })}
@@ -748,10 +810,13 @@ export default function App() {
         </div>
       </section>
 
+
       <section className="mb-6">
         <h2 className="font-semibold mb-2">9) Матриця нормованих значень</h2>
         <div className="overflow-auto">
           {Array.from({ length: numCriteria }).map((_, cIdx) => {
+            const type = criteriaTypes[cIdx];
+
             const allAltsTris = Array.from({ length: numAlternatives }).map(
               (_, aIdx) => {
                 const tris = Array.from({ length: numExperts }).map(
@@ -774,23 +839,19 @@ export default function App() {
                 );
                 const uMax = Math.max(...tris.map((t) => t[2]));
 
-                return [
-                  lMin / numCriteria,
-                  lProd / numCriteria,
-                  mProd / numCriteria,
-                  uProd / numCriteria,
-                  uMax / numCriteria,
-                ];
+                return [lMin, lProd, mProd, uProd, uMax];
               }
             );
 
-            const optimalAlt = [
-              Math.max(...allAltsTris.map((t) => t[0])),
-              Math.max(...allAltsTris.map((t) => t[1])),
-              Math.max(...allAltsTris.map((t) => t[2])),
-              Math.max(...allAltsTris.map((t) => t[3])),
-              Math.max(...allAltsTris.map((t) => t[4])),
-            ];
+
+            const optimalAlt = [0, 1, 2, 3, 4].map((idx) => {
+              const vals = allAltsTris.map((t) => t[idx]);
+              if (type === "benefit") {
+                return Math.max(...vals);
+              } else {
+                return Math.min(...vals);
+              }
+            });
 
             return (
               <div key={cIdx} className="mb-4 border p-2 rounded">
@@ -808,9 +869,7 @@ export default function App() {
                   </thead>
                   <tbody>
                     <tr className="bg-gray-100 font-medium">
-                      <td className="border px-2 py-1 text-center">
-                        Optimal alternative
-                      </td>
+                      <td className="border px-2 py-1 text-center">Optimal alternative</td>
                       {optimalAlt.map((v, idx) => (
                         <td key={idx} className="border px-2 py-1 text-center">
                           {v.toFixed(5)}
@@ -824,10 +883,7 @@ export default function App() {
                           Alternative {aIdx + 1}
                         </td>
                         {vals.map((v, idx) => (
-                          <td
-                            key={idx}
-                            className="border px-2 py-1 text-center"
-                          >
+                          <td key={idx} className="border px-2 py-1 text-center">
                             {v.toFixed(5)}
                           </td>
                         ))}
@@ -840,6 +896,7 @@ export default function App() {
           })}
         </div>
       </section>
+
 
       <section className="mb-6">
         <h2 className="font-semibold mb-2">10) Нормована зважена матриця</h2>
